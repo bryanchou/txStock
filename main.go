@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/axgle/mahonia"
+	"github.com/chain-zhang/pinyin"
 	"github.com/daviddengcn/go-colortext"
 	"io/ioutil"
 	"log"
@@ -69,29 +70,33 @@ func StartStock(file *os.File) {
 		txs.CurrentTime = time.Now().Format("2006-01-02 15:04:05")
 		txs.saveToFile(file)
 		formatStr := iniParser.GetString("output", "format")
+		var consoleStr string
 		if strings.Trim(formatStr, " ") == "" {
-			fmt.Printf("%-12s C:%.2f H:%.2f L:%.2f O:%.2f riseAndFall:%.2f %.2f%% volumn:%.0f\n", txs.StockName, txs.Price, txs.TheHightest, txs.TheLowest, txs.OpenPrice, txs.RiseAndFall, txs.PricesEtc, txs.Volume)
+			consoleStr = fmt.Sprintf("%-12s C:%.2f H:%.2f L:%.2f O:%.2f riseAndFall:%.2f %.2f%% volumn:%.0f\n", txs.StockName, txs.Price, txs.TheHightest, txs.TheLowest, txs.OpenPrice, txs.RiseAndFall, txs.PricesEtc, txs.Volume)
 		} else {
-			var consoleStr string
 			formatStrs := strings.Split(formatStr, " ")
 			paramValues := GetPrintValue(iniParser, txs)
 
 			if len(paramValues) > 0 {
 				for i, v := range paramValues {
-					consoleStr += fmt.Sprintf(formatStrs[i], v) + " "
+					consoleStr += fmt.Sprintf("%-15s", fmt.Sprintf(formatStrs[i], v))
 				}
 			}
-			if txs.RiseAndFall < 0 {
-				ct.ChangeColor(ct.Green, true, ct.Black, false)
-				fmt.Println(consoleStr)
-				ct.ResetColor()
-			} else if txs.RiseAndFall == 0 {
-				fmt.Println(consoleStr)
-			} else {
-				ct.ChangeColor(ct.Red, true, ct.Black, false)
-				fmt.Println(consoleStr)
-				ct.ResetColor()
-			}
+		}
+
+		if txs.RiseAndFall < 0 {
+			ct.ChangeColor(ct.Green, true, ct.Black, false)
+			fmt.Println(consoleStr)
+			log.Println(consoleStr)
+			ct.ResetColor()
+		} else if txs.RiseAndFall == 0 {
+			fmt.Println(consoleStr)
+			log.Println(consoleStr)
+		} else {
+			ct.ChangeColor(ct.Red, true, ct.Black, false)
+			fmt.Println(consoleStr)
+			log.Println(consoleStr)
+			ct.ResetColor()
 		}
 
 	}
@@ -118,7 +123,7 @@ func GetPrintValue(iniParse *utils.IniParser, txsStock TXStock) []interface{} {
 	for i, v := range colomnKeys {
 		switch v {
 		case 1:
-			paramValues[i] = txsStock.StockName
+			paramValues[i], _ = pinyin.New(txsStock.StockName).Split("").Mode(pinyin.WithoutTone).Convert()
 			break
 		case 2:
 			paramValues[i] = txsStock.StockCode
@@ -614,4 +619,16 @@ func (txStock TXStock) saveToFile(file *os.File) {
 		fmt.Println(err)
 	}
 	_, _ = file.WriteString(string(jsonBytes) + " \r\n")
+}
+
+var loger *log.Logger
+
+func init() {
+	file := "../logs/" + GetCurrentDate() + "-go-monitor.log"
+	logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
+	if err != nil {
+		panic(err)
+	}
+	loger = log.New(logFile, "[go-monitor]    ", log.LstdFlags|log.Lshortfile|log.LUTC) // 将文件设置为loger作为输出
+	return
 }
